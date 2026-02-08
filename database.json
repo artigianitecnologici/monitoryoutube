@@ -1,22 +1,28 @@
 {
     "videos": {
         "https://youtu.be/aRxCb82GJyc": {
-            "title": "AI Bot Telegram 100% LOCALE: Ollama + Gemma 3 su Windows 11 (Senza Cloud e Gratis)",
-            "views": 16,
+            "title": "AI BOT TELEGRAM 100% LOCALE: OLLAMA + GEMMA 3 SU WINDOWS 11 (SENZA CLOUD E GRATIS)",
+            "views": 15,
             "start_views": 16,
             "history": [
-                16
+                16,
+                15,
+                16,
+                15
             ]
         },
         "https://youtube.com/shorts/toTHXkwm9Ek?feature=share": {
-            "title": "Mi presento: Sono MARRtino, il Robot AI che NON ti spia (Demo Offline)",
+            "title": "MI PRESENTO: SONO MARRTINO, IL ROBOT AI CHE NON TI SPIA (DEMO OFFLINE)",
             "views": 38,
             "start_views": 38,
             "history": [
+                38,
+                38,
+                38,
                 38
             ]
         }
     },
     "subs": "4",
-    "last_update": "2026-02-08T18:28:37.937276"
+    "last_update": "2026-02-08T18:36:27.634751"
 }

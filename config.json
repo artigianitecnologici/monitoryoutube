@@ -2,7 +2,7 @@
   "app_settings": {
     "window_width": 1000,
     "window_height": 800,
-    "window_title": "YouTube Live Monitor 24H",
+    "window_title": "RobCo Industries Terminal",
     "update_interval_seconds": 3600,
     "max_history_points": 24
   },
@@ -13,12 +13,12 @@
     ]
   },
   "colors": {
-    "background": "#121212",
-    "panel_bg": "#1e1e1e",
-    "text_primary": "#ffffff",
-    "text_secondary": "#aaaaaa",
-    "views_green": "#00ff41", 
-    "subs_blue": "#00ccff",
+    "background": "#000000",
+    "panel_bg": "#0a1a0a",
+    "text_primary": "#1aff1a",
+    "text_secondary": "#00b300",
+    "views_green": "#1aff1a", 
+    "subs_blue": "#1aff1a",
     "line_colors": ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93"]
   }
 }

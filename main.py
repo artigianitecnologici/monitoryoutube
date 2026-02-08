@@ -3,7 +3,7 @@ import json
 import threading
 import time
 import os
-import random  # Aggiunto per la variazione di tempo
+import random
 from datetime import datetime
 from playwright.sync_api import sync_playwright
 
@@ -17,14 +17,13 @@ def hex_to_rgb(hex_color):
 CONFIG = load_config()
 COLORS = {k: hex_to_rgb(v) for k, v in CONFIG['colors'].items() if k != "line_colors"}
 LINE_COLORS = [hex_to_rgb(c) for c in CONFIG['colors']['line_colors']]
-DB_FILE = "database.json" # File per salvare lo storico
+DB_FILE = "database.json" 
 
-# --- GESTIONE DATI (Store & Persistenza) ---
+# --- GESTIONE DATI ---
 video_data_store = {}
 global_subs = "---"
 
 def load_data_store():
-    """Carica lo storico salvato per non perdere il grafico al riavvio"""
     global video_data_store, global_subs
     if os.path.exists(DB_FILE):
         try:
@@ -32,23 +31,13 @@ def load_data_store():
                 data = json.load(f)
                 video_data_store = data.get("videos", {})
                 global_subs = data.get("subs", "---")
-                print("Storico caricato con successo.")
-        except Exception as e:
-            print(f"Errore caricamento storico: {e}")
+        except: pass
 
 def save_data_store():
-    """Salva lo storico su file"""
-    data = {
-        "videos": video_data_store,
-        "subs": global_subs,
-        "last_update": datetime.now().isoformat()
-    }
+    data = { "videos": video_data_store, "subs": global_subs, "last_update": datetime.now().isoformat() }
     try:
-        with open(DB_FILE, 'w') as f:
-            json.dump(data, f, indent=4)
-        print("Storico salvato su database.json")
-    except Exception as e:
-        print(f"Errore salvataggio storico: {e}")
+        with open(DB_FILE, 'w') as f: json.dump(data, f, indent=4)
+    except: pass
 
 # --- UTILS ---
 def normalize_url(url):
@@ -64,33 +53,25 @@ def normalize_url(url):
 # --- SCRAPER ---
 def scraper_worker():
     global video_data_store, global_subs
-    
-    # Init store (se non caricato dal DB)
     for url in CONFIG['target']['videos']:
         if url not in video_data_store:
-            video_data_store[url] = {
-                "title": "In attesa...", "views": 0, "start_views": 0,
-                "history": [] 
-            }
+            video_data_store[url] = { "title": "INITIALIZING...", "views": 0, "start_views": 0, "history": [] }
 
     while True:
-        print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Avvio scansione...")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] SCANNING FREQUENCIES...")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             
             for raw_url in CONFIG['target']['videos']:
                 target_url = normalize_url(raw_url)
-                
                 try:
                     page.goto(target_url, wait_until="networkidle", timeout=60000)
                     
-                    # 1. Dati Video
                     player_resp = page.evaluate("() => window.ytInitialPlayerResponse")
                     title = player_resp['videoDetails']['title']
                     views = int(player_resp['videoDetails']['viewCount'])
                     
-                    # 2. Iscritti
                     try:
                         init_data = page.evaluate("() => window.ytInitialData")
                         r1 = init_data['contents']['twoColumnWatchNextResults']['results']['results']['contents']
@@ -102,85 +83,82 @@ def scraper_worker():
                             global_subs = clean_subs
                     except: pass
 
-                    # 3. Aggiornamento Store
-                    if raw_url not in video_data_store:
-                         video_data_store[raw_url] = {"history": [], "start_views": views}
-
-                    if video_data_store[raw_url].get("start_views", 0) == 0:
-                        video_data_store[raw_url]["start_views"] = views
+                    if raw_url not in video_data_store: video_data_store[raw_url] = {"history": [], "start_views": views}
+                    if video_data_store[raw_url].get("start_views", 0) == 0: video_data_store[raw_url]["start_views"] = views
 
                     history = video_data_store[raw_url]["history"]
                     history.append(views)
+                    if len(history) > CONFIG['app_settings']['max_history_points']: history.pop(0)
+
+                    video_data_store[raw_url].update({ "title": title.upper(), "views": views, "history": history })
                     
-                    # Mantieni max N punti (come da config, es. 24)
-                    max_pts = CONFIG['app_settings']['max_history_points']
-                    if len(history) > max_pts: 
-                        history.pop(0)
-
-                    video_data_store[raw_url].update({
-                        "title": title, "views": views, "history": history
-                    })
-                    
-                    print(f" -> {title[:20]}... : {views}")
-
-                except Exception as e:
-                    print(f"Errore {raw_url}: {e}")
-                
-                time.sleep(2) # Piccola pausa tra un video e l'altro
-
+                except Exception as e: print(f"ERR: {e}")
+                time.sleep(2)
             browser.close()
         
-        # Salva su disco dopo ogni aggiornamento
         save_data_store()
-
-        # CALCOLO PROSSIMO AGGIORNAMENTO
-        # Base: 1 ora (3600 sec) +/- 10 min (600 sec)
-        base_interval = CONFIG['app_settings']['update_interval_seconds']
-        variance = 600 # 10 minuti in secondi
         
-        # Genera numero casuale tra -600 e +600
-        jitter = random.randint(-variance, variance)
-        wait_time = base_interval + jitter
-        
-        # Sicurezza: mai meno di 60 secondi
+        base = CONFIG['app_settings']['update_interval_seconds']
+        wait_time = base + random.randint(-600, 600)
         if wait_time < 60: wait_time = 60
-
-        print(f"Scansione completata. Prossimo aggiornamento tra {wait_time/60:.1f} minuti.")
         time.sleep(wait_time)
 
-# --- GUI ---
+# --- GUI / FALLOUT STYLE ---
+
+def get_font(size, bold=False):
+    fonts = ["couriernew", "consolas", "lucidaconsole", "monaco", "fixedsys"]
+    return pygame.font.SysFont(fonts, size, bold=bold)
 
 def draw_header(screen, w, h):
-    pygame.draw.rect(screen, COLORS['panel_bg'], (0, 0, w, h))
-    font_title = pygame.font.SysFont("Arial", 24, bold=True)
-    font_subs = pygame.font.SysFont("Arial", 40, bold=True)
-    screen.blit(font_title.render("YOUTUBE MONITOR 24H", True, COLORS['text_secondary']), (20, 20))
+    pygame.draw.line(screen, COLORS['text_secondary'], (0, h-2), (w, h-2), 2)
     
-    subs_lbl = font_title.render("ISCRITTI :", True, COLORS['text_secondary'])
-    subs_val = font_subs.render(global_subs, True, COLORS['subs_blue'])
-    screen.blit(subs_lbl, (w - 350, 25))
-    screen.blit(subs_val, (w - 150, 15))
+    font_clock = get_font(60, bold=True) 
+    font_lbl = get_font(18, bold=True)
+    font_val = get_font(40, bold=True)
+    
+    now_str = datetime.now().strftime("%H:%M:%S")
+    clock_surf = font_clock.render(now_str, True, COLORS['text_primary'])
+    glow_surf = font_clock.render(now_str, True, (0, 50, 0)) 
+    screen.blit(glow_surf, (22, 17))
+    screen.blit(clock_surf, (20, 15))
+
+    status_surf = font_lbl.render("STATUS: ONLINE [REC]", True, COLORS['text_secondary'])
+    screen.blit(status_surf, (20, 75))
+
+    subs_lbl = font_lbl.render("SUBSCRIBERS", True, COLORS['text_secondary'])
+    subs_val = font_val.render(global_subs, True, COLORS['subs_blue'])
+    
+    subs_lbl_w = subs_lbl.get_width()
+    subs_val_w = subs_val.get_width()
+    
+    screen.blit(subs_lbl, (w - subs_lbl_w - 20, 20))
+    screen.blit(subs_val, (w - subs_val_w - 20, 45))
 
 def draw_list_row(screen, x, y, w, h, data, color_idx):
-    pygame.draw.rect(screen, COLORS['panel_bg'], (x, y, w, h), border_radius=8)
-    line_color = LINE_COLORS[color_idx % len(LINE_COLORS)]
-    pygame.draw.circle(screen, line_color, (x + 20, y + h//2), 8)
+    pygame.draw.rect(screen, COLORS['panel_bg'], (x, y, w, h))
+    pygame.draw.rect(screen, COLORS['text_secondary'], (x, y, w, h), 1)
 
-    font_title = pygame.font.SysFont("Arial", 18)
-    font_big = pygame.font.SysFont("Arial", 28, bold=True)
-    font_small = pygame.font.SysFont("Arial", 14)
+    # Colore specifico per questo video
+    specific_color = LINE_COLORS[color_idx % len(LINE_COLORS)]
+    
+    # Pallino colorato
+    pygame.draw.rect(screen, specific_color, (x + 10, y + h//2 - 6, 12, 12)) 
 
-    title_surf = font_title.render(data.get('title', 'Loading...')[:50], True, COLORS['text_primary'])
-    screen.blit(title_surf, (x + 50, y + 15))
+    font_title = get_font(18, bold=True)
+    font_big = get_font(30, bold=True)
+    font_small = get_font(14)
+
+    title_text = data.get('title', 'LOADING...').upper()[:45]
+    title_surf = font_title.render(title_text, True, COLORS['text_primary'])
+    screen.blit(title_surf, (x + 40, y + 15))
 
     views = data.get('views', 0)
     v_str = f"{views:,}".replace(",", ".")
     views_surf = font_big.render(v_str, True, COLORS['views_green'])
-    screen.blit(views_surf, (x + w - 200, y + 15))
+    screen.blit(views_surf, (x + w - 220, y + 15))
 
-    # Calcolo delta ultime 24h (primo punto vs ultimo punto)
     history = data.get("history", [])
-    pct_str = "N/A"
+    pct_str = "DATA: N/A"
     if len(history) >= 2:
         start_h = history[0]
         curr_h = history[-1]
@@ -188,52 +166,72 @@ def draw_list_row(screen, x, y, w, h, data, color_idx):
             diff = curr_h - start_h
             pct = (diff / start_h) * 100
             symbol = "+" if pct >= 0 else ""
-            pct_str = f"24h: {symbol}{pct:.2f}% ({diff:+})"
+            pct_str = f"DELTA: {symbol}{pct:.2f}%"
     
-    screen.blit(font_small.render(pct_str, True, COLORS['text_secondary']), (x + w - 200, y + 45))
+    screen.blit(font_small.render(pct_str, True, COLORS['text_secondary']), (x + w - 220, y + 50))
 
 def draw_time_graph(screen, rect):
     x, y, w, h = rect
-    pygame.draw.rect(screen, (20, 20, 20), rect, border_radius=10)
+    pygame.draw.rect(screen, (0, 0, 0), rect)
+    pygame.draw.rect(screen, COLORS['text_secondary'], rect, 2)
     
-    font_axis = pygame.font.SysFont("Arial", 12)
-    screen.blit(font_axis.render("ULTIME 24 LETTURE -->", True, COLORS['text_secondary']), (x + w - 200, y + h - 20))
+    # Griglia verde scuro
+    for gx in range(x, x+w, 50):
+        pygame.draw.line(screen, (0, 30, 0), (gx, y), (gx, y+h), 1)
+    for gy in range(y, y+h, 50):
+        pygame.draw.line(screen, (0, 30, 0), (x, gy), (x+w, gy), 1)
+
+    font_axis = get_font(12)
+    screen.blit(font_axis.render("HISTORY BUFFER [24H] - ABSOLUTE SCALE", True, COLORS['text_secondary']), (x + w - 300, y + h - 20))
 
     urls = CONFIG['target']['videos']
     if not urls: return
 
+    # 1. TROVA MINIMO E MASSIMO GLOBALI (Tra tutti i video)
+    all_values = []
+    for u in urls:
+        hist = video_data_store.get(u, {}).get("history", [])
+        all_values.extend(hist)
+    
+    if not all_values: return
+
+    global_min = min(all_values)
+    global_max = max(all_values)
+    global_diff = global_max - global_min
+    if global_diff == 0: global_diff = 1
+
+    # Stampa etichette scala Min/Max
+    max_lbl = font_axis.render(f"MAX: {global_max:,}", True, COLORS['text_secondary'])
+    min_lbl = font_axis.render(f"MIN: {global_min:,}", True, COLORS['text_secondary'])
+    screen.blit(max_lbl, (x + 10, y + 10))
+    screen.blit(min_lbl, (x + 10, y + h - 20))
+
+    # 2. DISEGNA I GRAFICI
     for idx, url in enumerate(urls):
         data = video_data_store.get(url, {})
         history = data.get("history", [])
         if len(history) < 2: continue
 
+        # Colore specifico
         color = LINE_COLORS[idx % len(LINE_COLORS)]
         
-        # Normalizzazione locale (Sparkline) per vedere il trend
-        local_min = min(history)
-        local_max = max(history)
-        diff = local_max - local_min
-        if diff == 0: diff = 1
-
         points = []
-        # Spalma i punti sulla larghezza disponibile
         step_x = (w - 40) / (CONFIG['app_settings']['max_history_points'] - 1)
         
         for i, val in enumerate(history):
             px = x + 20 + (i * step_x)
-            norm_y = (val - local_min) / diff 
+            # Normalizzazione basata su GLOBAL MIN/MAX
+            norm_y = (val - global_min) / global_diff 
             py = (y + h - 30) - (norm_y * (h - 60))
             points.append((px, py))
 
         if len(points) > 1:
             pygame.draw.lines(screen, color, False, points, 3)
             for p in points:
-                pygame.draw.circle(screen, color, (int(p[0]), int(p[1])), 4)
+                pygame.draw.rect(screen, color, (int(p[0])-3, int(p[1])-3, 6, 6))
 
 def main():
     pygame.init()
-    
-    # Carica dati salvati precedentemente
     load_data_store()
 
     W, H = CONFIG['app_settings']['window_width'], CONFIG['app_settings']['window_height']
@@ -244,8 +242,8 @@ def main():
     t = threading.Thread(target=scraper_worker, daemon=True)
     t.start()
 
-    header_h = 80
-    list_h = int((H - header_h) * 0.4) 
+    header_h = 100
+    list_h = int((H - header_h) * 0.45) 
     graph_h = H - header_h - list_h
 
     running = True
@@ -254,6 +252,7 @@ def main():
             if event.type == pygame.QUIT: running = False
 
         screen.fill(COLORS['background'])
+        
         draw_header(screen, W, header_h)
 
         video_urls = CONFIG['target']['videos']
@@ -270,7 +269,6 @@ def main():
         pygame.display.flip()
         clock.tick(30)
     
-    # Salvataggio finale alla chiusura
     save_data_store()
     pygame.quit()
 

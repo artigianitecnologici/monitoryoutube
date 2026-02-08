@@ -1,0 +1,24 @@
+{
+  "app_settings": {
+    "window_width": 1000,
+    "window_height": 800,
+    "window_title": "YouTube Live Monitor",
+    "update_interval_seconds": 600,
+    "max_history_points": 24
+  },
+  "target": {
+    "videos": [
+      "https://youtu.be/aRxCb82GJyc",
+      "https://youtube.com/shorts/toTHXkwm9Ek?feature=share"
+    ]
+  },
+  "colors": {
+    "background": "#121212",
+    "panel_bg": "#1e1e1e",
+    "text_primary": "#ffffff",
+    "text_secondary": "#aaaaaa",
+    "views_green": "#00ff41", 
+    "subs_blue": "#00ccff",
+    "line_colors": ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93"]
+  }
+}
